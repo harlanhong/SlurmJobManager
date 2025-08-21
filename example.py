@@ -2,14 +2,29 @@ from job_manager import JobManager
 import time
 
 def main():
-    # 创建任务管理器实例
+    # 创建任务管理器实例（前台模式）
     manager = JobManager(
         max_concurrent_jobs=2,
         check_interval=30.0,    # 每30秒检查一次任务状态
         max_retries=2,          # 失败任务最多重试2次
         print_interval=60.0,    # 每60秒打印一次状态信息
-        verbose=True            # 启用状态打印
+        verbose=True,           # 启用控制台输出
+        log_file="jobs.log",    # 同时写入日志文件
+        daemon=False            # 前台运行模式
     )
+    
+    # 或者使用后台模式
+    """
+    manager = JobManager(
+        max_concurrent_jobs=2,
+        check_interval=30.0,
+        max_retries=2,
+        print_interval=60.0,
+        verbose=False,          # 禁用控制台输出
+        log_file="jobs.log",    # 必须指定日志文件
+        daemon=True             # 后台运行模式
+    )
+    """
     
     # 示例1：使用Python执行器（默认）
     manager.add_job(

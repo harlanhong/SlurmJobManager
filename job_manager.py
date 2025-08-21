@@ -1,6 +1,8 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TextIO
 from collections import deque
 import time
+import sys
+import os
 from datetime import datetime, timedelta
 from .job import Job, JobStatus
 
@@ -11,7 +13,9 @@ class JobManager:
         check_interval: float = 60.0,
         max_retries: int = 3,
         print_interval: float = 300.0,  # 默认每5分钟打印一次状态
-        verbose: bool = True
+        verbose: bool = True,
+        log_file: Optional[str] = None,
+        daemon: bool = False
     ):
         """
         初始化任务管理器
@@ -22,13 +26,24 @@ class JobManager:
             max_retries: 任务失败后最大重试次数
             print_interval: 打印状态信息的时间间隔（秒）
             verbose: 是否打印详细信息
+            log_file: 日志文件路径，如果指定则将输出写入文件
+            daemon: 是否以守护进程方式运行（后台运行）
         """
         self.max_concurrent_jobs = max_concurrent_jobs
         self.check_interval = check_interval
         self.max_retries = max_retries
         self.print_interval = print_interval
         self.verbose = verbose
+        self.daemon = daemon
         self.last_print_time = 0
+        
+        # 设置日志输出
+        self.log_file = None
+        if log_file:
+            log_dir = os.path.dirname(log_file)
+            if log_dir:
+                os.makedirs(log_dir, exist_ok=True)
+            self.log_file = open(log_file, 'a')
         
         self.active_jobs: Dict[str, Job] = {}  # 正在运行的任务
         self.pending_jobs: deque[Job] = deque()  # 等待执行的任务
@@ -137,12 +152,32 @@ class JobManager:
         运行任务管理器主循环
         """
         try:
+            # 如果是后台运行模式，将输出重定向到日志文件
+            if self.daemon:
+                if not self.log_file:
+                    raise ValueError("后台运行模式必须指定日志文件")
+                sys.stdout = self.log_file
+                sys.stderr = self.log_file
+                
+            self._log(f"\n=== 任务管理器启动 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===")
+            self._log(f"最大并发任务数: {self.max_concurrent_jobs}")
+            self._log(f"检查间隔: {self.check_interval}秒")
+            self._log(f"状态打印间隔: {self.print_interval}秒")
+            self._log(f"运行模式: {'后台' if self.daemon else '前台'}")
+            self._log("="*50 + "\n")
+            
             while self.active_jobs or self.pending_jobs:
                 self.update_status()
                 time.sleep(self.check_interval)
+                
         except KeyboardInterrupt:
-            print("\n正在取消所有活动任务...")
+            self._log("\n正在取消所有活动任务...")
             self.cancel_all_jobs()
+            
+        finally:
+            if self.log_file:
+                self._log(f"\n=== 任务管理器关闭 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===\n")
+                self.log_file.close()
 
     def cancel_all_jobs(self):
         """
@@ -198,10 +233,18 @@ class JobManager:
             
         return status_info
         
+    def _log(self, message: str):
+        """输出日志信息"""
+        if self.log_file:
+            self.log_file.write(message + "\n")
+            self.log_file.flush()
+        if self.verbose:
+            print(message)
+
     def _print_status(self):
         """打印当前任务状态信息"""
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"\n=== 任务状态更新 ({current_time}) ===")
+        self._log(f"\n=== 任务状态更新 ({current_time}) ===")
         
         # 获取所有任务状态
         all_status = self.get_all_jobs_status()
@@ -221,40 +264,40 @@ class JobManager:
         
         # 打印活动任务
         if status_groups["RUNNING"]:
-            print("\n活动任务:")
+            self._log("\n活动任务:")
             for job_id, info in status_groups["RUNNING"]:
-                print(f"  - {job_id} (Slurm ID: {info['slurm_id']}):")
-                print(f"    状态: {info['status']}")
-                print(f"    运行时间: {info['runtime']}")
-                print(f"    资源: {info['partition']}, {info['num_gpus']}GPU, {info['memory']}内存")
+                self._log(f"  - {job_id} (Slurm ID: {info['slurm_id']}):")
+                self._log(f"    状态: {info['status']}")
+                self._log(f"    运行时间: {info['runtime']}")
+                self._log(f"    资源: {info['partition']}, {info['num_gpus']}GPU, {info['memory']}内存")
                 if info['retry_count'] > 0:
-                    print(f"    重试次数: {info['retry_count']}")
+                    self._log(f"    重试次数: {info['retry_count']}")
         
         # 打印等待任务
         if status_groups["QUEUED"]:
-            print("\n等待任务:")
+            self._log("\n等待任务:")
             for job_id, info in status_groups["QUEUED"]:
-                print(f"  - {job_id} (将使用: {info['partition']}, {info['num_gpus']}GPU, {info['memory']}内存)")
+                self._log(f"  - {job_id} (将使用: {info['partition']}, {info['num_gpus']}GPU, {info['memory']}内存)")
         
         # 打印最近完成的任务
         if status_groups["COMPLETED"]:
-            print("\n已完成任务:")
+            self._log("\n已完成任务:")
             for job_id, info in status_groups["COMPLETED"]:
-                print(f"  - {job_id}: 运行时间 {info['runtime']}")
+                self._log(f"  - {job_id}: 运行时间 {info['runtime']}")
         
         # 打印失败任务
         if status_groups["FAILED"] or status_groups["CANCELLED"]:
-            print("\n失败/取消的任务:")
+            self._log("\n失败/取消的任务:")
             for status in ["FAILED", "CANCELLED"]:
                 for job_id, info in status_groups[status]:
-                    print(f"  - {job_id} ({status})")
+                    self._log(f"  - {job_id} ({status})")
                     if info['retry_count'] > 0:
-                        print(f"    重试次数: {info['retry_count']}")
+                        self._log(f"    重试次数: {info['retry_count']}")
         
-        print("\n任务统计:")
-        print(f"  运行中: {len(status_groups['RUNNING'])}")
-        print(f"  等待中: {len(status_groups['QUEUED'])}")
-        print(f"  已完成: {len(status_groups['COMPLETED'])}")
-        print(f"  已失败: {len(status_groups['FAILED'])}")
-        print(f"  已取消: {len(status_groups['CANCELLED'])}")
-        print("="*50)
+        self._log("\n任务统计:")
+        self._log(f"  运行中: {len(status_groups['RUNNING'])}")
+        self._log(f"  等待中: {len(status_groups['QUEUED'])}")
+        self._log(f"  已完成: {len(status_groups['COMPLETED'])}")
+        self._log(f"  已失败: {len(status_groups['FAILED'])}")
+        self._log(f"  已取消: {len(status_groups['CANCELLED'])}")
+        self._log("="*50)

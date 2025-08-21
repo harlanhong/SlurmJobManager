@@ -25,6 +25,8 @@ A Python-based job manager for Slurm that helps you manage and monitor multiple 
   - Periodic status printing
   - Detailed runtime statistics
   - Email notifications for job completion/failure
+  - Status logging to file
+  - Background running mode
 
 - **Error Handling**
   - Automatic job retries on failure
@@ -56,7 +58,9 @@ manager = JobManager(
     max_concurrent_jobs=2,
     check_interval=30.0,    # Check job status every 30 seconds
     print_interval=60.0,    # Print status every 60 seconds
-    verbose=True
+    verbose=True,           # Enable status printing
+    log_file="jobs.log",    # Log file path
+    daemon=False            # Run in foreground mode
 )
 
 # Add a simple Python job
@@ -106,9 +110,30 @@ manager.add_job(
 )
 ```
 
-### Job Status Monitoring
+### Running Modes
 
-The manager will periodically print status information like this:
+#### Foreground Mode (Default)
+```python
+manager = JobManager(
+    verbose=True,           # Enable console output
+    log_file="jobs.log"     # Optional: Also write to log file
+)
+manager.run()
+```
+
+#### Background Mode
+```python
+manager = JobManager(
+    verbose=False,          # Disable console output
+    log_file="jobs.log",    # Required for background mode
+    daemon=True             # Enable background mode
+)
+manager.run()
+```
+
+### Status Monitoring
+
+The manager will periodically print/log status information like this:
 
 ```
 === Job Status Update (2024-01-20 15:30:45) ===
@@ -132,6 +157,11 @@ Job Statistics:
   Failed: 0
   Cancelled: 0
 ==================================================
+
+# Status information will be:
+# - Printed to console in foreground mode (if verbose=True)
+# - Written to log file (if log_file is specified)
+# - Both (if both options are enabled)
 ```
 
 ## Advanced Features
@@ -178,7 +208,9 @@ manager.add_job(
 - `check_interval`: Time between job status checks (seconds)
 - `max_retries`: Maximum number of retry attempts for failed jobs
 - `print_interval`: Time between status prints (seconds)
-- `verbose`: Enable/disable status printing
+- `verbose`: Enable/disable console output
+- `log_file`: Path to log file (required for daemon mode)
+- `daemon`: Run in background mode (requires log_file)
 
 ### Job Parameters
 
