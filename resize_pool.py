@@ -5,21 +5,18 @@ import sys
 import psutil
 
 def find_manager_pid():
-    """查找运行中的任务管理器进程"""
-    from job_manager import JobManager
-    manager_class_name = JobManager.__name__
-    
-    for proc in psutil.process_iter(['pid', 'cmdline']):
-        try:
-            # 获取进程的内存映射信息
-            maps = proc.memory_maps()
-            # 检查进程是否使用了JobManager模块
-            for m in maps:
-                if 'job_manager.py' in m.path:
-                    return proc.pid
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
-            continue
-    return None
+    """从PID文件中读取任务管理器进程ID"""
+    try:
+        with open("/tmp/slurm_job_manager.pid", "r") as f:
+            pid = int(f.read().strip())
+            # 验证进程是否存在
+            try:
+                os.kill(pid, 0)  # 发送信号0来检查进程是否存在
+                return pid
+            except OSError:
+                return None
+    except (FileNotFoundError, ValueError):
+        return None
 
 def resize_pool(new_size: int):
     """调整任务池大小"""

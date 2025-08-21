@@ -19,8 +19,20 @@ if [ $1 -le 0 ]; then
     exit 1
 fi
 
-# 查找任务管理器进程
-MANAGER_PID=$(ps aux | grep "python" | grep "job_manager.py" | grep -v "grep" | awk '{print $2}')
+# 从PID文件读取进程ID
+if [ ! -f "/tmp/slurm_job_manager.pid" ]; then
+    echo "错误：未找到任务管理器PID文件"
+    exit 1
+fi
+
+MANAGER_PID=$(cat /tmp/slurm_job_manager.pid)
+
+# 验证进程是否存在
+if ! kill -0 $MANAGER_PID 2>/dev/null; then
+    echo "错误：任务管理器进程不存在"
+    rm -f /tmp/slurm_job_manager.pid
+    exit 1
+fi
 
 if [ -z "$MANAGER_PID" ]; then
     echo "错误：未找到运行中的任务管理器进程"

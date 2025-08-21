@@ -202,6 +202,20 @@ class JobManager:
             
             # 设置信号处理器
             signal.signal(signal.SIGUSR1, self._handle_resize)
+            
+            # 将PID写入文件
+            pid_file = "/tmp/slurm_job_manager.pid"
+            with open(pid_file, "w") as f:
+                f.write(str(os.getpid()))
+            
+            # 确保退出时删除PID文件
+            def cleanup():
+                try:
+                    os.remove(pid_file)
+                except OSError:
+                    pass
+            import atexit
+            atexit.register(cleanup)
                 
             self._log(f"\n=== 任务管理器启动 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===")
             self._log(f"最大并发任务数: {self.max_concurrent_jobs}")
