@@ -1,7 +1,22 @@
 from job_manager import JobManager
 import time
 
-def main():
+def resize_pool_example():
+    """展示如何在运行时调整任务池大小"""
+    import threading
+    import time
+    
+    def resize_after_delay():
+        # 等待30秒后将池大小调整为1
+        time.sleep(30)
+        print("\n正在将任务池大小调整为1...")
+        manager.resize_pool(1)
+        
+        # 再等待30秒后将池大小调整回2
+        time.sleep(30)
+        print("\n正在将任务池大小调整回2...")
+        manager.resize_pool(2)
+    
     # 创建任务管理器实例（前台模式）
     manager = JobManager(
         max_concurrent_jobs=2,
@@ -12,6 +27,11 @@ def main():
         log_file="jobs.log",    # 同时写入日志文件
         daemon=False            # 前台运行模式
     )
+    
+    # 启动一个线程在30秒后调整池大小
+    resize_thread = threading.Thread(target=resize_after_delay)
+    resize_thread.daemon = True
+    resize_thread.start()
     
     # 或者使用后台模式
     """

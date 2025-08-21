@@ -134,13 +134,13 @@ class Job:
             # 添加其他执行器参数
             cmd.extend(self.executor_args)
             
-            # 添加blend文件（如果有）
-            blend_file = None
-            for key, value in list(self.args.items()):
-                if key.startswith(("blend_file", "animation_blendfile")):
-                    blend_file = value
-                    del self.args[key]
-                    break
+            # # 添加blend文件（如果有）
+            # blend_file = None
+            # for key, value in list(self.args.items()):
+            #     if key.startswith(("blend_file", "animation_blendfile")):
+            #         blend_file = value
+            #         del self.args[key]
+            #         break
             
             # 添加Python脚本
             cmd.extend(["--python", self.script_path])
@@ -150,7 +150,7 @@ class Job:
             
             # 添加其他参数（每个参数独立一行）
             script_content += " \\\n".join([" ".join(cmd)] + [
-                f"--{key}='{str(value)}' \\"
+                f"--{key} '{value}' "
                 for key, value in self.args.items()
             ]) + "\n"
         else:
@@ -164,10 +164,9 @@ class Job:
         script_content += "# End of script\n"
         
         # 创建临时作业脚本
-        script_path = f"/tmp/slurm_job_{self.job_id}.sh"
+        script_path = f"tmp/slurm_job_{self.job_id}.sh"
         with open(script_path, "w") as f:
             f.write(script_content)
-        
         # 设置执行权限
         os.chmod(script_path, 0o755)
         return script_path
