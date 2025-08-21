@@ -1,0 +1,2 @@
+python-hostlist>=1.21
+subprocess32>=3.5.4
