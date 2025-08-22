@@ -136,6 +136,27 @@ manager = JobManager(
 manager.run()
 ```
 
+#### Web Monitor Mode
+```python
+manager = JobManager(
+    verbose=True,           # Enable console output
+    log_file="jobs.log"     # Optional: Also write to log file
+)
+# Enable web monitoring interface
+manager.run(
+    web_monitor=True,       # Enable web monitoring
+    web_host='127.0.0.1',   # Listen on localhost
+    web_port=5000           # Use port 5000
+)
+```
+
+The web interface will be available at `http://127.0.0.1:5000` and provides:
+- Real-time status updates
+- Job statistics
+- Resource usage information
+- Runtime tracking
+- Error monitoring
+
 ### Status Monitoring
 
 The manager will periodically print/log status information like this:

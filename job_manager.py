@@ -176,9 +176,14 @@ class JobManager:
             self.log_file.close()
         sys.exit(0)
 
-    def run(self):
+    def run(self, web_monitor: bool = False, web_host: str = '127.0.0.1', web_port: int = 5000):
         """
         运行任务管理器主循环
+        
+        Args:
+            web_monitor: 是否启用Web监控界面
+            web_host: Web服务器监听地址
+            web_port: Web服务器监听端口
         """
         try:
             # 如果是后台运行模式，将输出重定向到日志文件
@@ -199,7 +204,20 @@ class JobManager:
             self._log(f"检查间隔: {self.check_interval}秒")
             self._log(f"状态打印间隔: {self.print_interval}秒")
             self._log(f"运行模式: {'后台' if self.daemon else '前台'}")
+            if web_monitor:
+                self._log(f"Web监控: http://{web_host}:{web_port}")
             self._log("="*50 + "\n")
+            
+            # 启动Web监控（如果启用）
+            if web_monitor:
+                from . import web_monitor as wm
+                import threading
+                web_thread = threading.Thread(
+                    target=wm.run_monitor,
+                    args=(self, web_host, web_port)
+                )
+                web_thread.daemon = True
+                web_thread.start()
             
             while self.active_jobs or self.pending_jobs:
                 self.update_status()

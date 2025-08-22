@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slurm任务监控</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .job-card {
+            margin-bottom: 15px;
+        }
+        .status-badge {
+            font-size: 0.9em;
+            padding: 5px 10px;
+        }
+        .timestamp {
+            font-size: 0.8em;
+            color: #666;
+        }
+        .stats-card {
+            background-color: #f8f9fa;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+        }
+        .stat-number {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="mb-4">Slurm任务监控</h1>
+        <div class="timestamp text-end mb-3">最后更新: <span id="timestamp">-</span></div>
+
+        <!-- 统计信息 -->
+        <div class="card stats-card mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col stat-item">
+                        <div class="stat-number text-primary" id="running-count">0</div>
+                        <div class="stat-label">运行中</div>
+                    </div>
+                    <div class="col stat-item">
+                        <div class="stat-number text-warning" id="queued-count">0</div>
+                        <div class="stat-label">等待中</div>
+                    </div>
+                    <div class="col stat-item">
+                        <div class="stat-number text-success" id="completed-count">0</div>
+                        <div class="stat-label">已完成</div>
+                    </div>
+                    <div class="col stat-item">
+                        <div class="stat-number text-danger" id="failed-count">0</div>
+                        <div class="stat-label">已失败</div>
+                    </div>
+                    <div class="col stat-item">
+                        <div class="stat-number text-secondary" id="cancelled-count">0</div>
+                        <div class="stat-label">已取消</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 运行中的任务 -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                运行中的任务
+            </div>
+            <div class="card-body" id="running-jobs">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 等待中的任务 -->
+        <div class="card mb-4">
+            <div class="card-header bg-warning">
+                等待中的任务
+            </div>
+            <div class="card-body" id="queued-jobs">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 已完成的任务 -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                已完成的任务
+            </div>
+            <div class="card-body" id="completed-jobs">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 失败的任务 -->
+        <div class="card mb-4">
+            <div class="card-header bg-danger text-white">
+                失败的任务
+            </div>
+            <div class="card-body" id="failed-jobs">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 已取消的任务 -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                已取消的任务
+            </div>
+            <div class="card-body" id="cancelled-jobs">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4/dist/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('status_update', (data) => {
+            // 更新时间戳
+            document.getElementById('timestamp').textContent = data.timestamp;
+
+            // 更新统计信息
+            document.getElementById('running-count').textContent = data.stats.running;
+            document.getElementById('queued-count').textContent = data.stats.queued;
+            document.getElementById('completed-count').textContent = data.stats.completed;
+            document.getElementById('failed-count').textContent = data.stats.failed;
+            document.getElementById('cancelled-count').textContent = data.stats.cancelled;
+
+            // 更新运行中的任务
+            const runningJobs = document.getElementById('running-jobs');
+            runningJobs.innerHTML = data.groups.running.map(job => `
+                <div class="card job-card">
+                    <div class="card-body">
+                        <h5 class="card-title">${job.id}</h5>
+                        <p class="card-text">
+                            Slurm ID: ${job.slurm_id}<br>
+                            运行时间: ${job.runtime}<br>
+                            资源: ${job.resources}
+                        </p>
+                    </div>
+                </div>
+            `).join('');
+
+            // 更新等待中的任务
+            const queuedJobs = document.getElementById('queued-jobs');
+            queuedJobs.innerHTML = data.groups.queued.map(job => `
+                <div class="card job-card">
+                    <div class="card-body">
+                        <h5 class="card-title">${job.id}</h5>
+                        <p class="card-text">
+                            将使用: ${job.resources}
+                        </p>
+                    </div>
+                </div>
+            `).join('');
+
+            // 更新已完成的任务
+            const completedJobs = document.getElementById('completed-jobs');
+            completedJobs.innerHTML = data.groups.completed.map(job => `
+                <div class="card job-card">
+                    <div class="card-body">
+                        <h5 class="card-title">${job.id}</h5>
+                        <p class="card-text">
+                            运行时间: ${job.runtime}
+                        </p>
+                    </div>
+                </div>
+            `).join('');
+
+            // 更新失败的任务
+            const failedJobs = document.getElementById('failed-jobs');
+            failedJobs.innerHTML = data.groups.failed.map(job => `
+                <div class="card job-card">
+                    <div class="card-body">
+                        <h5 class="card-title">${job.id}</h5>
+                        <p class="card-text">
+                            重试次数: ${job.retry_count}
+                        </p>
+                    </div>
+                </div>
+            `).join('');
+
+            // 更新已取消的任务
+            const cancelledJobs = document.getElementById('cancelled-jobs');
+            cancelledJobs.innerHTML = data.groups.cancelled.map(job => `
+                <div class="card job-card">
+                    <div class="card-body">
+                        <h5 class="card-title">${job.id}</h5>
+                    </div>
+                </div>
+            `).join('');
+        });
+    </script>
+</body>
+</html>
