@@ -8,14 +8,14 @@ A Python-based job manager for Slurm that helps you manage and monitor multiple 
   - Limit concurrent running jobs
   - Automatic job submission when slots become available
   - Priority queue for failed job retries
-  - Dynamic pool size adjustment
+
 
 - **Resource Management**
   - GPU allocation
   - CPU cores configuration
   - Memory allocation
   - Partition selection
-  - Runtime resource reallocation
+
 
 - **Environment Support**
   - Conda environment activation
@@ -24,21 +24,19 @@ A Python-based job manager for Slurm that helps you manage and monitor multiple 
 
 - **Status Monitoring**
   - Real-time job status updates
-  - Periodic status printing
+  - Periodic status printing with Swiss time (CET/CEST)
   - Detailed runtime statistics
   - Email notifications for job completion/failure
   - Status logging to file
   - Background running mode
+  - Graceful signal handling (SIGTERM, SIGINT, SIGHUP, SIGQUIT)
 
 - **Error Handling**
   - Automatic job retries on failure
   - Configurable retry limits
   - Detailed error logging
 
-- **Dynamic Control**
-  - Adjust pool size at runtime
-  - Graceful resource reduction
-  - Preserve running jobs during resizing
+
 
 ## Installation
 
@@ -143,7 +141,7 @@ manager.run()
 The manager will periodically print/log status information like this:
 
 ```
-=== Job Status Update (2024-01-20 15:30:45) ===
+=== Job Status Update (2024-01-20 15:30:45 CET) ===
 
 Active Jobs:
   - render_task (Slurm ID: 12345):
@@ -173,31 +171,6 @@ Job Statistics:
 
 ## Advanced Features
 
-### Dynamic Pool Size Adjustment
-
-You can adjust the task pool size at runtime without interrupting running jobs:
-
-```python
-# 方法1：直接调用resize_pool方法
-manager.resize_pool(new_size=1)  # 将池大小调整为1
-
-# 方法2：如果在其他进程中调整
-import os
-import signal
-
-# 将新的大小写入临时文件
-with open("/tmp/slurm_pool_size", "w") as f:
-    f.write("1")
-
-# 发送SIGUSR1信号给管理器进程
-os.kill(manager_pid, signal.SIGUSR1)
-```
-
-调整池大小时：
-- 已运行的任务会继续执行直到完成
-- 新的池大小限制仅影响新任务的提交
-- 可以随时增加或减少池大小
-- 所有更改都会记录到日志中
 
 ### SBATCH Configuration
 
