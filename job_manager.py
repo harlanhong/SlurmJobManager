@@ -3,8 +3,17 @@ from collections import deque
 import time
 import sys
 import os
+import signal
 from datetime import datetime, timedelta
+import pytz
 from .job import Job, JobStatus
+
+def get_swiss_time() -> str:
+    """获取瑞士时间"""
+    swiss_tz = pytz.timezone('Europe/Zurich')
+    utc_time = datetime.now(pytz.UTC)
+    swiss_time = utc_time.astimezone(swiss_tz)
+    return swiss_time.strftime("%Y-%m-%d %H:%M:%S %Z")
 
 class JobManager:
     def __init__(
@@ -151,6 +160,22 @@ class JobManager:
 
 
 
+    def _signal_handler(self, signum, frame):
+        """处理信号"""
+        signal_names = {
+            signal.SIGTERM: "SIGTERM",
+            signal.SIGINT: "SIGINT (Ctrl+C)",
+            signal.SIGHUP: "SIGHUP",
+            signal.SIGQUIT: "SIGQUIT"
+        }
+        signal_name = signal_names.get(signum, f"Signal {signum}")
+        self._log(f"\n收到{signal_name}信号，正在取消所有活动任务...")
+        self.cancel_all_jobs()
+        if self.log_file:
+            self._log(f"\n=== 任务管理器关闭 ({get_swiss_time()}) ===\n")
+            self.log_file.close()
+        sys.exit(0)
+
     def run(self):
         """
         运行任务管理器主循环
@@ -163,9 +188,13 @@ class JobManager:
                 sys.stdout = self.log_file
                 sys.stderr = self.log_file
             
-
+            # 设置信号处理器
+            signal.signal(signal.SIGTERM, self._signal_handler)  # 终止信号
+            signal.signal(signal.SIGINT, self._signal_handler)   # Ctrl+C
+            signal.signal(signal.SIGHUP, self._signal_handler)   # 终端关闭
+            signal.signal(signal.SIGQUIT, self._signal_handler)  # Ctrl+\
                 
-            self._log(f"\n=== 任务管理器启动 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===")
+            self._log(f"\n=== 任务管理器启动 ({get_swiss_time()}) ===")
             self._log(f"最大并发任务数: {self.max_concurrent_jobs}")
             self._log(f"检查间隔: {self.check_interval}秒")
             self._log(f"状态打印间隔: {self.print_interval}秒")
@@ -176,9 +205,11 @@ class JobManager:
                 self.update_status()
                 time.sleep(self.check_interval)
                 
-        except KeyboardInterrupt:
+        except Exception as e:
+            self._log(f"\n发生错误: {type(e).__name__}: {str(e)}")
             self._log("\n正在取消所有活动任务...")
             self.cancel_all_jobs()
+            raise  # 重新抛出异常以便查看完整的错误信息
             
         finally:
             if self.log_file:
@@ -249,8 +280,7 @@ class JobManager:
 
     def _print_status(self):
         """打印当前任务状态信息"""
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self._log(f"\n=== 任务状态更新 ({current_time}) ===")
+        self._log(f"\n=== 任务状态更新 ({get_swiss_time()}) ===")
         
         # 获取所有任务状态
         all_status = self.get_all_jobs_status()
