@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional, TextIO
+from typing import List, Dict, Any, Optional, TextIO, Tuple
 from collections import deque
 import time
 import sys
@@ -7,6 +7,7 @@ import signal
 from datetime import datetime, timedelta
 import pytz
 from .job import Job, JobStatus
+from .cluster_info import ClusterInfo
 
 def get_swiss_time() -> str:
     """获取瑞士时间"""
@@ -60,6 +61,9 @@ class JobManager:
         self.failed_jobs: Dict[str, Job] = {}  # 失败的任务
         
         self.retry_counts: Dict[str, int] = {}  # 任务重试次数记录
+        
+        # 初始化集群信息管理器
+        self.cluster_info = ClusterInfo()
 
     def add_job(
         self,
@@ -83,11 +87,23 @@ class JobManager:
             
         job = Job(job_id, script_path, args, **kwargs)
         
+        # 检查资源是否可用
+        available, reason = self.cluster_info.check_resource_availability(
+            partition=job.partition,
+            cpus=job.num_cpus,
+            gpus=job.num_gpus,
+            memory=job.memory
+        )
+        
+        if not available:
+            self._log(f"任务 {job_id} 资源检查失败: {reason}")
+            return False
+            
         if len(self.active_jobs) < self.max_concurrent_jobs:
             return self._submit_job(job)
         else:
             self.pending_jobs.append(job)
-            print(f"任务 {job_id} 已添加到等待队列")
+            self._log(f"任务 {job_id} 已添加到等待队列")
             return True
 
     def _submit_job(self, job: Job) -> bool:
@@ -260,10 +276,16 @@ class JobManager:
         """
         status_info = {}
         
+        # 获取集群资源信息
+        cluster_summary = self.cluster_info.get_resource_summary()
+        
         for jobs in [self.active_jobs, self.completed_jobs, self.failed_jobs]:
             for job_id, job in jobs.items():
                 runtime = job.get_runtime()
                 runtime_str = str(timedelta(seconds=int(runtime))) if runtime else "N/A"
+                
+                # 获取分区资源信息
+                partition_info = self.cluster_info.get_partition_info(job.partition)
                 
                 status_info[job_id] = {
                     "status": job.status.value,
@@ -272,10 +294,12 @@ class JobManager:
                     "retry_count": self.retry_counts.get(job_id, 0),
                     "partition": job.partition,
                     "num_gpus": job.num_gpus,
-                    "memory": job.memory
+                    "memory": job.memory,
+                    "partition_info": partition_info if partition_info else {}
                 }
         
         for job in self.pending_jobs:
+            partition_info = self.cluster_info.get_partition_info(job.partition)
             status_info[job.job_id] = {
                 "status": "QUEUED",
                 "slurm_id": None,
@@ -283,8 +307,12 @@ class JobManager:
                 "retry_count": self.retry_counts.get(job.job_id, 0),
                 "partition": job.partition,
                 "num_gpus": job.num_gpus,
-                "memory": job.memory
+                "memory": job.memory,
+                "partition_info": partition_info if partition_info else {}
             }
+        
+        # 添加集群资源摘要
+        status_info["__cluster_summary__"] = cluster_summary
             
         return status_info
         

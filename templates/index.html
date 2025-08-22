@@ -39,8 +39,52 @@
         <h1 class="mb-4">Slurm任务监控</h1>
         <div class="timestamp text-end mb-3">最后更新: <span id="timestamp">-</span></div>
 
-        <!-- 统计信息 -->
+        <!-- 集群资源信息 -->
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                集群资源状态
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">节点</h5>
+                                <p class="card-text">
+                                    可用: <span id="available-nodes">0</span> / <span id="total-nodes">0</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">GPU</h5>
+                                <p class="card-text">
+                                    可用: <span id="available-gpus">0</span> / <span id="total-gpus">0</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">分区</h5>
+                                <p class="card-text">
+                                    总数: <span id="total-partitions">0</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 任务统计信息 -->
         <div class="card stats-card mb-4">
+            <div class="card-header bg-primary text-white">
+                任务统计
+            </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col stat-item">
@@ -130,7 +174,16 @@
             // 更新时间戳
             document.getElementById('timestamp').textContent = data.timestamp;
 
-            // 更新统计信息
+            // 更新集群资源信息
+            if (data.__cluster_summary__) {
+                document.getElementById('available-nodes').textContent = data.__cluster_summary__.available_nodes;
+                document.getElementById('total-nodes').textContent = data.__cluster_summary__.total_nodes;
+                document.getElementById('available-gpus').textContent = data.__cluster_summary__.available_gpus;
+                document.getElementById('total-gpus').textContent = data.__cluster_summary__.total_gpus;
+                document.getElementById('total-partitions').textContent = data.__cluster_summary__.partitions;
+            }
+
+            // 更新任务统计信息
             document.getElementById('running-count').textContent = data.stats.running;
             document.getElementById('queued-count').textContent = data.stats.queued;
             document.getElementById('completed-count').textContent = data.stats.completed;

@@ -9,13 +9,13 @@ A Python-based job manager for Slurm that helps you manage and monitor multiple 
   - Automatic job submission when slots become available
   - Priority queue for failed job retries
 
-
 - **Resource Management**
-  - GPU allocation
+  - GPU allocation and monitoring
   - CPU cores configuration
   - Memory allocation
   - Partition selection
-
+  - Real-time cluster resource tracking
+  - Resource availability checks
 
 - **Environment Support**
   - Conda environment activation
@@ -31,12 +31,18 @@ A Python-based job manager for Slurm that helps you manage and monitor multiple 
   - Background running mode
   - Graceful signal handling (SIGTERM, SIGINT, SIGHUP, SIGQUIT)
 
+- **Cluster Awareness**
+  - Real-time resource monitoring
+  - Node status tracking
+  - GPU availability checks
+  - Partition status monitoring
+  - Resource usage statistics
+
 - **Error Handling**
   - Automatic job retries on failure
   - Configurable retry limits
   - Detailed error logging
-
-
+  - Resource validation before submission
 
 ## Installation
 
@@ -156,6 +162,9 @@ The web interface will be available at `http://127.0.0.1:5000` and provides:
 - Resource usage information
 - Runtime tracking
 - Error monitoring
+- Cluster resource monitoring
+- Node status tracking
+- GPU availability
 
 ### Status Monitoring
 
@@ -163,6 +172,11 @@ The manager will periodically print/log status information like this:
 
 ```
 === Job Status Update (2024-01-20 15:30:45 CET) ===
+
+Cluster Resources:
+  Nodes: 10 available / 20 total
+  GPUs:  15 available / 40 total
+  Partitions: 4
 
 Active Jobs:
   - render_task (Slurm ID: 12345):
@@ -192,6 +206,32 @@ Job Statistics:
 
 ## Advanced Features
 
+### Resource Monitoring
+
+The manager automatically monitors cluster resources and provides:
+
+```python
+# Get cluster resource summary
+summary = manager.cluster_info.get_resource_summary()
+print(f"Available GPUs: {summary['available_gpus']} / {summary['total_gpus']}")
+
+# Check resource availability before submitting
+available, reason = manager.cluster_info.check_resource_availability(
+    partition="gpu",
+    cpus=4,
+    gpus=1,
+    memory="32G"
+)
+if available:
+    manager.add_job(...)
+else:
+    print(f"Cannot submit job: {reason}")
+
+# Get detailed partition information
+partition_info = manager.cluster_info.get_partition_info("gpu")
+print(f"Partition nodes: {partition_info['total_nodes']}")
+print(f"Available GPUs: {partition_info['available_gpus']}")
+```
 
 ### SBATCH Configuration
 
