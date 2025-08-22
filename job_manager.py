@@ -3,7 +3,6 @@ from collections import deque
 import time
 import sys
 import os
-import signal
 from datetime import datetime, timedelta
 from .job import Job, JobStatus
 
@@ -37,8 +36,6 @@ class JobManager:
         self.verbose = verbose
         self.daemon = daemon
         self.last_print_time = 0
-        self.resize_requested = False
-        self.new_pool_size = max_concurrent_jobs
         
         # 设置日志输出
         self.log_file = None
@@ -139,14 +136,7 @@ class JobManager:
             elif status == JobStatus.FAILED:
                 self._handle_failed_job(job)
         
-        # 处理池大小调整请求
-        if self.resize_requested:
-            old_size = self.max_concurrent_jobs
-            self.max_concurrent_jobs = self.new_pool_size
-            self.resize_requested = False
-            self._log(f"\n任务池大小已调整：{old_size} -> {self.max_concurrent_jobs}")
-            self._log(f"当前活动任务数：{len(self.active_jobs)}")
-            self._log(f"等待任务数：{len(self.pending_jobs)}")
+
         
         # 提交等待队列中的任务
         while len(self.active_jobs) < self.max_concurrent_jobs and self.pending_jobs:
@@ -159,34 +149,7 @@ class JobManager:
             self._print_status()
             self.last_print_time = current_time
 
-    def _handle_resize(self, signum, frame):
-        """处理SIGUSR1信号，用于动态调整池大小"""
-        try:
-            with open("/tmp/slurm_pool_size", "r") as f:
-                new_size = int(f.read().strip())
-                if new_size > 0:
-                    self.resize_requested = True
-                    self.new_pool_size = new_size
-                    self._log(f"\n收到池大小调整请求：{self.max_concurrent_jobs} -> {new_size}")
-        except (FileNotFoundError, ValueError) as e:
-            self._log(f"\n读取新池大小失败: {e}")
 
-    def resize_pool(self, new_size: int):
-        """
-        动态调整任务池大小
-        
-        Args:
-            new_size: 新的最大并发任务数
-        """
-        if new_size <= 0:
-            raise ValueError("池大小必须大于0")
-            
-        # 将新的大小写入临时文件
-        with open("/tmp/slurm_pool_size", "w") as f:
-            f.write(str(new_size))
-        
-        # 发送SIGUSR1信号给进程
-        os.kill(os.getpid(), signal.SIGUSR1)
 
     def run(self):
         """
@@ -200,22 +163,7 @@ class JobManager:
                 sys.stdout = self.log_file
                 sys.stderr = self.log_file
             
-            # 设置信号处理器
-            signal.signal(signal.SIGUSR1, self._handle_resize)
-            
-            # 将PID写入文件
-            pid_file = "/tmp/slurm_job_manager.pid"
-            with open(pid_file, "w") as f:
-                f.write(str(os.getpid()))
-            
-            # 确保退出时删除PID文件
-            def cleanup():
-                try:
-                    os.remove(pid_file)
-                except OSError:
-                    pass
-            import atexit
-            atexit.register(cleanup)
+
                 
             self._log(f"\n=== 任务管理器启动 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===")
             self._log(f"最大并发任务数: {self.max_concurrent_jobs}")
